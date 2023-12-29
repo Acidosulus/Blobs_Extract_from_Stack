@@ -1,6 +1,8 @@
 import configparser 
 import sys
+import os
 from sqlalchemy.engine import URL
+from click import echo, style
 import pprint
 printer = pprint.PrettyPrinter(indent=12, width=180)
 prnt = printer.pprint
@@ -10,14 +12,11 @@ class Options:
 	def __init__(self, path:str):
 		self.config = configparser.ConfigParser()
 		self.config.read(path)
-		#self.SELF_ADRESS = self.config[sys.platform]["webserver"]
-		#self.API_ADRESS = self.config[sys.platform]["apiserver"]
-		#self.LANDDBURI = self.config[sys.platform]["langdb"]
-		#self.SECRET_KEY = self.config[sys.platform]["SECRET_KEY"]
-		
-		#	print(f'SELF_ADRESS:{self.SELF_ADRESS}')
-		#print(f'API_ADRESS:{self.API_ADRESS}')
-		#print(f'LANDDBURI:{self.LANDDBURI}')
+		self.path	= self.config[sys.platform]["unload_root_path"]
+		print(f'unload path: {self.path}   {os.path.isdir(self.path)}')
+		if not os.path.isdir(self.path):
+			echo(style(text=f"directory {self.path} doesn't exist", bg='blue', fg='bright_red'))
+			exit()
 		if sys.platform == 'linux':
 			self.connection_url_ul = URL.create(
 			"mssql+pyodbc",

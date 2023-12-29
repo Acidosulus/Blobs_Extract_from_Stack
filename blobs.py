@@ -1,8 +1,8 @@
+import os
 from click import echo, style
 from sqlalchemy import create_engine
 from sqlalchemy import Column, Integer, Table, MetaData, and_
 from sqlalchemy.orm import Session
-from sqlalchemy import Integer,  ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Computed, DateTime, ForeignKey, Integer, Table, Text, desc, select, update
 from sqlalchemy.sql.sqltypes import NullType
@@ -18,10 +18,9 @@ prnt = printer.pprint
 import math
 import datetime
 import inspect
-from settings import Options
 
-options = Options('options.ini')
-#options.LANDDBURI
+from settings import Options
+options = Options('settings.ini')
 
 def get_queryresult_header_and_data(query_result):
 	result = []
@@ -120,7 +119,22 @@ class OutsideDocument():
 			self.agreement_area		= data[0]['area']
 			self.agreement_folder	= data[0]['folder']
 
-
+	def create_store_path(self):
+		#options.path
+		lc_path_to_folder = options.path
+		if len(self.agreement_area)>0: # отделение
+			lc_path_to_folder = os.path.join(lc_path_to_folder , self.agreement_area)
+			if len(self.agreement_folder)>0: # участок
+				lc_path_to_folder = os.path.join(lc_path_to_folder, self.agreement_folder)
+				if len(self.agreement_number)>0: # номер договора
+					lc_path_to_folder = os.path.join(lc_path_to_folder, self.agreement_number)
+				if len(self.document_type + self.document_number)>0:
+					lc_path_to_folder = os.path.join(lc_path_to_folder,
+													self.document_type + ' ' + self.document_number.replace('/','-').replace('\\','-') + ' ' + f"{oDoc.document_date.year} {'0' if oDoc.document_date.month<10 else ''}{oDoc.document_date.month} {'0' if oDoc.document_date.day<10 else ''}{oDoc.document_date.day}"
+													)
+		os.makedirs(lc_path_to_folder)
+		return lc_path_to_folder
+	
 db = DB()
 #header, data = db.get_data("""select top 5 row_id from stack.[Договор]""")
 #prnt(header)
@@ -132,4 +146,14 @@ db = DB()
 oDoc = OutsideDocument(db, 182)
 print(oDoc.is_may_be_unload())
 prnt(oDoc.__dict__)
+oDoc.create_store_path()
+fc = oDoc.get_file_data_from_db()
+
+print(type(fc))
+
+f = open(oDoc, 'wb')
+f.write(fc)
+f.close()
+
+
 #print(oDoc.get_file_data_from_db())

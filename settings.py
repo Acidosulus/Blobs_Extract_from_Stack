@@ -11,7 +11,7 @@ prnt = printer.pprint
 class Options:
 	def __init__(self, path:str):
 		self.config = configparser.ConfigParser()
-		self.config.read(path)
+		self.config.read(path, encoding='utf-8')
 		self.path	= self.config[sys.platform]["unload_root_path"]
 		print(f'unload path: {self.path}   {os.path.isdir(self.path)}')
 		if not os.path.isdir(self.path):
@@ -38,7 +38,7 @@ class Options:
 			port=1433,
 			database="atom_khk_ul_test",
 			query={
-				"driver": "SQL Server",
+				"driver": "SQL Server Native Client 11.0",
 				"TrustServerCertificate": "yes"	},
 		)
 		print()

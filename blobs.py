@@ -132,7 +132,7 @@ class OutsideDocument():
 					lc_path_to_folder = os.path.join(lc_path_to_folder,
 													self.document_type + ' ' + self.document_number.replace('/','-').replace('\\','-') + ' ' + f"{oDoc.document_date.year} {'0' if oDoc.document_date.month<10 else ''}{oDoc.document_date.month} {'0' if oDoc.document_date.day<10 else ''}{oDoc.document_date.day}"
 													)
-		return lc_path_to_folder
+		return lc_path_to_folder + os.sep
 	
 	def create_store_path(self):
 		lc_path_to_folder = self.get_store_path()
@@ -173,7 +173,16 @@ class OutsideDocument():
 	def save_and_null_file_data(self):
 		save_result = self.save_file_on_disk()
 		if save_result:
-			self.db.session.execute(text(f"update stack.[Внешние документы] set [Оригинальное имя]='{self.full_file_path_on_disk}', [Код файла]=Null where row_id = {self.row_id}; commit;"))
+			print('---')
+			print(self.full_file_path_on_disk)
+			print('---')
+			path = os.path.split(self.full_file_path_on_disk)[0]
+			file_name = os.path.splitext( os.path.split(self.full_file_path_on_disk)[1] )[0]
+			ext = os.path.splitext(os.path.split(self.full_file_path_on_disk)[1])[1]
+			print(path)
+			print(file_name)
+			print(ext)
+			self.db.session.execute(text(f"update stack.[Внешние документы] set [Оригинальное имя]='{path + os.sep + file_name}', [Реальное имя]='{ext[1:]}', [Код файла]='' where row_id = {self.row_id}; commit;"))
 		return save_result
 
 
@@ -186,33 +195,7 @@ db = DB()
 
 
 
-
-
-
-
-
-
-
-
-#header, data = db.get_data("""select top 5 row_id from stack.[Договор]""")
-#prnt(header)
-#print()
-#prnt(data)
-
-
-#oDoc = OutsideDocument(db, 48)
-#oDoc = OutsideDocument(db, 11730)
-#oDoc = OutsideDocument(db, 31174)
-
-#oDoc = OutsideDocument(db, 11730)
-#print(oDoc.save_file_on_disk())
-
-
-#oDoc = OutsideDocument(db, 11729)
-#print(oDoc.save_file_on_disk())
-
-
-oDoc = OutsideDocument(db, 31175)
+oDoc = OutsideDocument(db, 31190+1)
 print(oDoc.save_and_null_file_data())
 
 

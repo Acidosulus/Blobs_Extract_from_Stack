@@ -10,6 +10,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.orm import declarative_base, registry
 from sqlalchemy import text
 from collections.abc import Iterable
+import zlib
 
 import pprint
 printer = pprint.PrettyPrinter(indent=12, width=180)
@@ -48,13 +49,13 @@ class DB():
 			header, data = get_queryresult_header_and_data(result)
 		return header, data
 
-
 class OutsideDocument():
 	def __init__(self, db:DB, row_id:int):
+		echo(style(text='[Внешние документы].row_id',fg='bright_blue')+' = '+style(text=row_id, fg='bright_cyan'))
 		self.db			=	db
 		self.row_id		=	row_id
 		self.agreemen_id = 0
-		self.agreement_area, self.agreement_folder, self.agreement_number, self.document_type, self.document_number, self.document_date = '', '', '', '', '', ''
+		self.full_file_path_on_disk, self.agreement_area, self.agreement_folder, self.agreement_number, self.document_type, self.document_number, self.document_date = '', '', '', '', '', '', ''
 		header, self.data = self.db.get_data(f"""select ROW_ID, [Документ-Файл], [Счет-Файл], [Вид документа], Комментарий, [Задолженность-Файл], [Договор-Файл], [Задолженность-Файлы], [Оригинальное имя], [Реальное имя], [Наряд-Файл], [Постановление-Файлы], [Движения-Файл], [ДоговорУК-Файл], [Документ владения], [ДокументЛич-Файл], [ИсторияЛиц-Файл], Дата, [ЗаявкаАбонента-Файл], [Организация-Файл], [РН-Файл], ИНТ_Тип, [ДокументТип-Файл], ДатаПодпГП, ДатаПодпКонтрагент, [Документ-ПодписьГП], [Документ-ПодписьКонтрагент], ДатКнц, ДатНач, [Документ-Составитель], [Соглашение-Файл], ТипДокЮР, Версия, Главный, Тип, [АккаунтЛК-Файл], [Документ-Свойства], [Документ-ОргОгр], old_id from stack.[Внешние документы] where row_id = {self.row_id} ;""")
 		if len(self.data)>0:
 			self.data = self.data[0]
@@ -63,13 +64,13 @@ class OutsideDocument():
 
 	def is_may_be_unload(self):
 		if len(self.data)<=0:
-			return False
+			return False, 'select result is empty'
 		if self.data['Вид документа']!=None:
 			if self.data['Вид документа']>0:
-				return False
-		return True
+				return False, "document type isn't zero"
+		return True, 'Ok'
 
-	def get_file_data_from_db(self):
+	def get_file_data_from_db(self) -> bytes:
 		header, data  = self.db.get_data(f"""select [Код файла] from stack.[Внешние документы] where row_id = {self.row_id} ;""")
 		if len(data)==0:
 			return None
@@ -77,7 +78,7 @@ class OutsideDocument():
 			return data[0]['Код файла']
 
 	def get_agreement_id(self):
-		if self.is_may_be_unload() == False:
+		if self.is_may_be_unload()[0] == False:
 			return None
 		
 		if self.data['Документ-Файл'] != None:
@@ -119,8 +120,7 @@ class OutsideDocument():
 			self.agreement_area		= data[0]['area']
 			self.agreement_folder	= data[0]['folder']
 
-	def create_store_path(self):
-		#options.path
+	def get_store_path(self):
 		lc_path_to_folder = options.path
 		if len(self.agreement_area)>0: # отделение
 			lc_path_to_folder = os.path.join(lc_path_to_folder , self.agreement_area)
@@ -132,10 +132,68 @@ class OutsideDocument():
 					lc_path_to_folder = os.path.join(lc_path_to_folder,
 													self.document_type + ' ' + self.document_number.replace('/','-').replace('\\','-') + ' ' + f"{oDoc.document_date.year} {'0' if oDoc.document_date.month<10 else ''}{oDoc.document_date.month} {'0' if oDoc.document_date.day<10 else ''}{oDoc.document_date.day}"
 													)
-		os.makedirs(lc_path_to_folder)
 		return lc_path_to_folder
 	
+	def create_store_path(self):
+		lc_path_to_folder = self.get_store_path()
+		try:
+			if not os.path.isdir(lc_path_to_folder):
+				os.makedirs(lc_path_to_folder)
+				echo(style(text='directories ', fg='green')+style(text=lc_path_to_folder, fg='bright_magenta')+style(text=' has been created', fg='green'))
+				return ''
+			else:
+				return ''
+		except:
+			return 'the directory has not been created'
+	
+	def save_file_on_disk(self):
+		if not self.is_may_be_unload()[0]:
+			print('the file cannot be unloaded to disk' + ' ' + self.is_may_be_unload()[1] )
+			return False	
+		error_text = self.create_store_path()
+		if len(error_text)>0:
+			print(error_text)
+			return False
+		self.full_file_path_on_disk = str(os.path.join(self.get_store_path(), self.data['Оригинальное имя']))
+		try:
+			if not os.path.isfile(self.full_file_path_on_disk):
+				file_compressed_source = oDoc.get_file_data_from_db()
+				file_handle = open(self.full_file_path_on_disk, 'wb')
+				file_handle.write(zlib.decompress(file_compressed_source))
+				file_handle.close()
+				echo(style(text='file: ', fg='bright_white')+' '+style(text=self.full_file_path_on_disk, fg='bright_yellow')+' '+style(text='is saved', fg='bright_green'))
+				return True
+			else:
+				echo(style(text='file: ', fg='bright_white')+' '+style(text=self.full_file_path_on_disk, fg='bright_yellow')+' '+style(text='is allready exists', fg='bright_green'))
+				return False
+		except: 
+			print('write file error')
+			return False
+		
+	def save_and_null_file_data(self):
+		save_result = self.save_file_on_disk()
+		if save_result:
+			self.db.session.execute(text(f"update stack.[Внешние документы] set [Оригинальное имя]='{self.full_file_path_on_disk}', [Код файла]=Null where row_id = {self.row_id}; commit;"))
+		return save_result
+
+
+
+
+
+
 db = DB()
+
+
+
+
+
+
+
+
+
+
+
+
 #header, data = db.get_data("""select top 5 row_id from stack.[Договор]""")
 #prnt(header)
 #print()
@@ -143,17 +201,21 @@ db = DB()
 
 
 #oDoc = OutsideDocument(db, 48)
-oDoc = OutsideDocument(db, 182)
-print(oDoc.is_may_be_unload())
-prnt(oDoc.__dict__)
-oDoc.create_store_path()
-fc = oDoc.get_file_data_from_db()
+#oDoc = OutsideDocument(db, 11730)
+#oDoc = OutsideDocument(db, 31174)
 
-print(type(fc))
+#oDoc = OutsideDocument(db, 11730)
+#print(oDoc.save_file_on_disk())
 
-f = open(oDoc, 'wb')
-f.write(fc)
-f.close()
+
+#oDoc = OutsideDocument(db, 11729)
+#print(oDoc.save_file_on_disk())
+
+
+oDoc = OutsideDocument(db, 31175)
+print(oDoc.save_and_null_file_data())
 
 
 #print(oDoc.get_file_data_from_db())
+
+

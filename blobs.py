@@ -132,7 +132,7 @@ class OutsideDocument():
 					lc_path_to_folder = os.path.join(lc_path_to_folder,
 													self.document_type + ' ' + self.document_number.replace('/','-').replace('\\','-') + ' ' + f"{oDoc.document_date.year} {'0' if oDoc.document_date.month<10 else ''}{oDoc.document_date.month} {'0' if oDoc.document_date.day<10 else ''}{oDoc.document_date.day}"
 													)
-		return lc_path_to_folder + os.sep
+		return (lc_path_to_folder + os.sep).replace(' ','_')
 	
 	def create_store_path(self):
 		lc_path_to_folder = self.get_store_path()
@@ -154,7 +154,7 @@ class OutsideDocument():
 		if len(error_text)>0:
 			print(error_text)
 			return False
-		self.full_file_path_on_disk = str(os.path.join(self.get_store_path(), self.data['Оригинальное имя']))
+		self.full_file_path_on_disk = str(os.path.join(self.get_store_path(), self.data['Оригинальное имя'].replace(' ','_')))
 		try:
 			if not os.path.isfile(self.full_file_path_on_disk):
 				file_compressed_source = oDoc.get_file_data_from_db()
@@ -182,7 +182,7 @@ class OutsideDocument():
 			print(path)
 			print(file_name)
 			print(ext)
-			self.db.session.execute(text(f"update stack.[Внешние документы] set [Оригинальное имя]='{path + os.sep + file_name}', [Реальное имя]='{ext[1:]}', [Код файла]='' where row_id = {self.row_id}; commit;"))
+			self.db.session.execute(text(f"update stack.[Внешние документы] set [Оригинальное имя]='{path + os.sep + file_name + ext}', [Код файла]='' where row_id = {self.row_id}; commit;"))
 		return save_result
 
 
@@ -195,7 +195,7 @@ db = DB()
 
 
 
-oDoc = OutsideDocument(db, 31190+1)
+oDoc = OutsideDocument(db, 31195)
 print(oDoc.save_and_null_file_data())
 
 
